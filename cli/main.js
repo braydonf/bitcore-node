@@ -20,29 +20,6 @@ function main() {
     .version(version);
 
   program
-    .command('create <directory> [name]')
-    .description('Create a new node')
-    .option('-d, --datadir <dir>', 'Specify the bitcoin database directory')
-    .action(function(dirname, name, cmd){
-      if (cmd.datadir) {
-        cmd.datadir = path.resolve(process.cwd(), cmd.datadir);
-      }
-      var opts = {
-        cwd: process.cwd(),
-        dirname: dirname,
-        name: name,
-        datadir: cmd.datadir || './data',
-        isGlobal: false
-      };
-      create(opts, function(err) {
-        if (err) {
-          throw err;
-        }
-        console.log('Successfully created node in directory: ', dirname);
-      });
-    });
-
-  program
     .command('start')
     .description('Start the current node')
     .option('-c, --config <dir>', 'Specify the directory with Bitcore Node configuration')
@@ -62,8 +39,8 @@ function main() {
     });
 
   program
-    .command('add <services...>')
-    .alias('install')
+    .command('install <services...>')
+    .alias('add')
     .description('Install a service for the current node')
     .action(function(services){
       var configInfo = findConfig(process.cwd());
@@ -89,8 +66,8 @@ function main() {
     });
 
   program
-    .command('remove <services...>')
-    .alias('uninstall')
+    .command('uninstall <services...>')
+    .alias('remove')
     .description('Uninstall a service for the current node')
     .action(function(services){
       var configInfo = findConfig(process.cwd());

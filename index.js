@@ -13,7 +13,6 @@ module.exports.services.DB = require('./lib/services/db');
 module.exports.services.Web = require('./lib/services/web');
 
 module.exports.scaffold = {};
-module.exports.scaffold.create = require('./lib/scaffold/create');
 module.exports.scaffold.add = require('./lib/scaffold/add');
 module.exports.scaffold.remove = require('./lib/scaffold/remove');
 module.exports.scaffold.start = require('./lib/scaffold/start');
