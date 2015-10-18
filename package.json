@@ -27,6 +27,10 @@
       "email": "patrick@bitpay.com"
     }
   ],
+  "bin": {
+    "bitcore": ".bin/bitcore",
+    "bitcored": ".bin/bitcored"
+  },
   "scripts": {
     "install": "./bin/install",
     "build": "./bin/build",
