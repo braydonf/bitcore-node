@@ -79,6 +79,12 @@ static void
 async_get_block_after(uv_work_t *req);
 
 static void
+async_is_spent(uv_work_t *req);
+
+static void
+async_is_spent_after(uv_work_t *req);
+
+static void
 async_get_tx(uv_work_t *req);
 
 static void
@@ -177,6 +183,20 @@ struct async_block_data {
   uint32_t size;
   CBlock cblock;
   CBlockIndex* cblock_index;
+  Isolate* isolate;
+  Persistent<Function> callback;
+};
+
+/**
+ * async_is_spent_data
+ */
+
+struct async_is_spent_data {
+  uv_work_t req;
+  std::string err_msg;
+  uint256 txid;
+  int outputIndex;
+  bool isSpent;
   Isolate* isolate;
   Persistent<Function> callback;
 };
@@ -1282,15 +1302,40 @@ async_get_tx_and_info_after(uv_work_t *r) {
  * Determine if an outpoint is spent
  */
 NAN_METHOD(IsSpent) {
-  if (info.Length() > 2) {
+  Isolate* isolate = info.GetIsolate();
+  HandleScope scope(isolate);
+  if (info.Length() < 3) {
     return ThrowError(
-      "Usage: bitcoind.isSpent(txid, outputIndex)");
+      "Usage: bitcoind.getSpent([blockhash,blockheight], callback)");
   }
+
+  async_is_spent_data *req = new async_is_spent_data();
 
   String::Utf8Value arg(info[0]->ToString());
   std::string argStr = std::string(*arg);
-  const uint256 txid = uint256S(argStr);
-  int outputIndex = info[1]->IntegerValue();
+
+  req->txid = uint256S(argStr);
+  req->outputIndex = info[1]->IntegerValue();
+  req->err_msg = std::string("");
+
+  Local<Function> callback = Local<Function>::Cast(info[2]);
+  req->req.data = req;
+  req->isolate = isolate;
+  req->callback.Reset(isolate, callback);
+  req->isSpent = true;
+
+  int status = uv_queue_work(uv_default_loop(),
+    &req->req, async_is_spent,
+    (uv_after_work_cb)async_is_spent_after);
+
+  assert(status == 0);
+
+  info.GetReturnValue().Set(Null());
+};
+
+static void
+async_is_spent(uv_work_t *req) {
+  async_is_spent_data* data = reinterpret_cast<async_is_spent_data*>(req->data);
 
   {
     LOCK(mempool.cs);
@@ -1300,16 +1345,47 @@ NAN_METHOD(IsSpent) {
     CCoinsViewMemPool viewMemPool(pcoinsTip, mempool);
     view.SetBackend(viewMemPool);
 
-    if (view.HaveCoins(txid)) {
-      const CCoins* coins = view.AccessCoins(txid);
-      if (coins && coins->IsAvailable(outputIndex)) {
-        info.GetReturnValue().Set(New<Boolean>(false));
+    if (view.HaveCoins(data->txid)) {
+      const CCoins* coins = view.AccessCoins(data->txid);
+      if (coins && coins->IsAvailable(data->outputIndex)) {
+        data->isSpent = false;
         return;
       }
     }
   }
-  info.GetReturnValue().Set(New<Boolean>(true));
-};
+
+  data->isSpent = true;
+
+
+}
+
+static void
+async_is_spent_after(uv_work_t *r) {
+  async_is_spent_data* req = reinterpret_cast<async_is_spent_data*>(r->data);
+  Isolate *isolate = req->isolate;
+  HandleScope scope(isolate);
+
+  Nan::TryCatch try_catch;
+  Local<Function> cb = Local<Function>::New(isolate, req->callback);
+
+  if (req->err_msg != "") {
+    Local<Value> err = Exception::Error(New(req->err_msg).ToLocalChecked());
+    Local<Value> argv[1] = { err };
+    cb->Call(isolate->GetCurrentContext()->Global(), 1, argv);
+  } else {
+    Local<Value> argv[2] = {
+      Local<Value>::New(isolate, Null()),
+      New<Boolean>(req->isSpent)
+    };
+    cb->Call(isolate->GetCurrentContext()->Global(), 2, argv);
+  }
+
+  if (try_catch.HasCaught()) {
+    Nan::FatalException(try_catch);
+  }
+
+  req->callback.Reset();
+}
 
 /**
  * GetBlockIndex()

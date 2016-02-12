@@ -749,9 +749,12 @@ describe('Node Functionality', function() {
       it('will return true if an input is spent in a confirmed transaction', function(done) {
         var txid = outputForIsSpentTest1.txid;
         var outputIndex = outputForIsSpentTest1.outputIndex;
-        var result = node.services.bitcoind.isSpent(txid, outputIndex);
-        result.should.equal(true);
-        done();
+        node.services.bitcoind.isSpent(txid, outputIndex, function(err, result) {
+          //Note: err is always undefined
+          result.should.equal(true);
+          done();
+        });
+
       });
       //CCoinsViewMemPool only checks for spent outputs that are not the mempool
       it('will correctly return false for an input that is spent in an unconfirmed transaction', function(done) {
@@ -773,9 +776,11 @@ describe('Node Functionality', function() {
           spentOutputInputTxId = tx.hash;
 
           setImmediate(function() {
-            var result = node.services.bitcoind.isSpent(unspentOutput.txid, unspentOutput.outputIndex);
-            result.should.equal(false);
-            done();
+            node.services.bitcoind.isSpent(unspentOutput.txid, unspentOutput.outputIndex, function(err, result) {
+              // Note: err is always undefined currently
+              result.should.equal(false);
+              done();
+            });
           });
         });
       });
